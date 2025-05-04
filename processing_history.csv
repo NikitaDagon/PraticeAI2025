@@ -1,0 +1,7 @@
+id,filename,date,frames_processed,objects_detected,processing_time,output_path
+53603b56-cbea-4db7-9a47-bbbe9d818ab3,istockphoto-1485488169-640_adpp_is.mp4,2025-05-04 14:05:20,325,160,184.77,uploads\result_53603b56-cbea-4db7-9a47-bbbe9d818ab3.mp4
+1c17c718-0623-4e3b-8c83-402c332af169,1476537_Drink_3840x2160.mov,2025-05-04 14:14:15,326,1398,263.52,uploads\result_1c17c718-0623-4e3b-8c83-402c332af169.mp4
+02d071d4-35b9-4d01-a445-f144f14e1019,1113198_Opening_Bachelorette_1920x1080.mp4,2025-05-04 14:33:23,478,68,345.35,uploads\result_02d071d4-35b9-4d01-a445-f144f14e1019.mp4
+197faeef-a910-4e0d-bdad-209707dfca77,1113198_Opening_Bachelorette_1920x1080.mp4,2025-05-04 15:20:38,478,31,299.84,uploads\result_197faeef-a910-4e0d-bdad-209707dfca77.mp4
+f5277b0a-16fe-45ec-9d75-94fb18e1e90a,detected_1113198_Opening_Bachelorette_1920x1080 (1).mp4,2025-05-04 15:30:37,478,21,308.81,uploads\result_f5277b0a-16fe-45ec-9d75-94fb18e1e90a.mp4
+f8dde9e9-08d9-48ac-a9b3-4db873549d79,detected_1113198_Opening_Bachelorette_1920x1080 (1).mp4,2025-05-04 15:42:55,478,21,325.62,uploads\result_f8dde9e9-08d9-48ac-a9b3-4db873549d79.mp4

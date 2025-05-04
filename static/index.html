@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Детекция бутылок в видео</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            border: none;
+        }
+        .card-header {
+            background-color: #0d6efd;
+            color: white;
+            font-weight: 600;
+            border-radius: 10px 10px 0 0 !important;
+        }
+        .progress {
+            height: 25px;
+            border-radius: 5px;
+        }
+        #videoPreview {
+            border-radius: 8px;
+            background-color: #000;
+            max-height: 400px;
+        }
+        .preview-container {
+            position: relative;
+        }
+        .object-counter {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: none;
+        }
+        .history-item:hover {
+            background-color: #f1f1f1;
+        }
+        #historyTable {
+            font-size: 14px;
+        }
+        .alert-position {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 300px;
+        }
+        .btn-report {
+            min-width: 90px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <!-- Система уведомлений -->
+        <div id="alertContainer" class="alert-position"></div>
+
+        <h1 class="text-center mb-4 text-primary">Детекция бутылок в видео</h1>
+
+        <!-- Блок загрузки и обработки -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-upload me-2"></i>Загрузка видео</span>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="videoInput" class="form-label">Выберите видеофайл (MP4, AVI, MOV):</label>
+                    <input class="form-control" type="file" id="videoInput" accept="video/mp4,video/avi,video/quicktime">
+                </div>
+
+                <div class="d-grid gap-2 mb-3">
+                    <button class="btn btn-primary" id="processBtn" type="button">
+                        <i class="bi bi-play-circle me-2"></i>Обработать видео
+                    </button>
+                </div>
+
+                <div class="mb-3">
+                    <div class="progress">
+                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+                            role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div id="progressText" class="text-center small text-muted mt-2">
+                        Ожидание загрузки видео...
+                    </div>
+                </div>
+
+                <div class="preview-container">
+                    <video id="videoPreview" controls class="w-100" style="display: none;"></video>
+                    <div id="objectCounter" class="object-counter">
+                        <i class="bi bi-cup-straw"></i> <span id="objectsCount">0</span> бутылок
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 mt-3">
+                    <a id="downloadLink" class="btn btn-success" style="display: none;">
+                        <i class="bi bi-download me-2"></i>Скачать результат
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Блок истории обработки -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-clock-history me-2"></i>История обработки</span>
+                <button id="refreshHistory" class="btn btn-sm btn-outline-light">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Файл</th>
+                                <th class="text-end">Бутылок</th>
+                                <th class="text-end">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTable">
+                            <tr>
+                                <td colspan="4" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Загрузка...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Элементы DOM
+        const videoInput = document.getElementById('videoInput');
+        const processBtn = document.getElementById('processBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const videoPreview = document.getElementById('videoPreview');
+        const downloadLink = document.getElementById('downloadLink');
+        const historyTable = document.getElementById('historyTable');
+        const objectCounter = document.getElementById('objectCounter');
+        const objectsCount = document.getElementById('objectsCount');
+        const alertContainer = document.getElementById('alertContainer');
+        const refreshHistoryBtn = document.getElementById('refreshHistory');
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHistory();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Обработка видео
+            processBtn.addEventListener('click', processVideo);
+
+            // Превью видео
+            videoInput.addEventListener('change', handleVideoUpload);
+
+            // Обновление истории
+            refreshHistoryBtn.addEventListener('click', loadHistory);
+        }
+
+        async function processVideo() {
+            if (!videoInput.files[0]) {
+                showAlert('Пожалуйста, выберите видео файл', 'warning');
+                return;
+            }
+
+            // Блокируем кнопку на время обработки
+            toggleProcessButton(true);
+
+            // Сбрасываем прогресс
+            resetProgress();
+
+            // Скрываем предыдущий результат
+            hideResults();
+
+            try {
+                const formData = new FormData();
+                formData.append('video', videoInput.files[0]);
+
+                // Отправляем запрос на обработку
+                const response = await fetch('http://localhost:5000/api/process-video', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error || 'Ошибка сервера');
+                }
+
+                // Получаем результат
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+
+                // Показываем результат
+                showResults(url);
+
+                // Обновляем прогресс
+                updateProgressUI(true);
+
+                // Показываем уведомление
+                showAlert('Видео успешно обработано!', 'success');
+
+                // Обновляем историю
+                loadHistory();
+
+            } catch (error) {
+                console.error('Ошибка обработки:', error);
+                updateProgressUI(false, error.message);
+                showAlert(`Ошибка: ${error.message}`, 'danger');
+            } finally {
+                toggleProcessButton(false);
+            }
+        }
+
+        function toggleProcessButton(loading) {
+            if (loading) {
+                processBtn.disabled = true;
+                processBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Обработка...';
+            } else {
+                processBtn.disabled = false;
+                processBtn.innerHTML = '<i class="bi bi-play-circle me-2"></i>Обработать видео';
+            }
+        }
+
+        function resetProgress() {
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('bg-success', 'bg-danger');
+            progressBar.classList.add('bg-primary');
+            progressText.textContent = 'Начало обработки...';
+        }
+
+        function hideResults() {
+            downloadLink.style.display = 'none';
+            objectCounter.style.display = 'none';
+        }
+
+        function showResults(url) {
+            downloadLink.href = url;
+            downloadLink.download = 'detected_' + videoInput.files[0].name;
+            downloadLink.style.display = 'block';
+        }
+
+        function updateProgressUI(success, errorMessage = '') {
+            if (success) {
+                progressBar.classList.remove('bg-primary');
+                progressBar.classList.add('bg-success');
+                progressText.textContent = 'Обработка успешно завершена!';
+            } else {
+                progressBar.classList.remove('bg-primary');
+                progressBar.classList.add('bg-danger');
+                progressText.textContent = errorMessage || 'Ошибка обработки';
+            }
+        }
+
+        async function handleVideoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Проверяем тип файла
+            const validTypes = ['video/mp4', 'video/avi', 'video/quicktime'];
+            if (!validTypes.includes(file.type)) {
+                showAlert('Пожалуйста, выберите видео файл (MP4, AVI или MOV)', 'warning');
+                videoInput.value = '';
+                return;
+            }
+
+            // Показываем превью
+            videoPreview.src = URL.createObjectURL(file);
+            videoPreview.style.display = 'block';
+            videoPreview.onloadedmetadata = () => {
+                progressText.textContent = `Готово к обработке: ${file.name} (${Math.round(file.size/1024/1024)} MB)`;
+            };
+
+            // Сбрасываем предыдущие результаты
+            downloadLink.style.display = 'none';
+            objectCounter.style.display = 'none';
+        }
+
+        // Загрузка истории обработки
+        async function loadHistory() {
+            try {
+                refreshHistoryBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+
+                const response = await fetch('http://localhost:5000/api/history');
+                if (!response.ok) throw new Error('Ошибка загрузки истории');
+
+                const history = await response.json();
+
+                if (history.length === 0) {
+                    historyTable.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted">
+                                <i class="bi bi-info-circle me-2"></i>История обработок пуста
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                historyTable.innerHTML = history.map(item => `
+                    <tr class="history-item">
+                        <td>${formatDate(item.date)}</td>
+                        <td class="text-truncate" style="max-width: 150px;" title="${item.filename}">
+                            ${item.filename}
+                        </td>
+                        <td class="text-end">${item.objects_detected}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary btn-report"
+                                onclick="generateReport('${item.id}', 'pdf', this)">
+                                <i class="bi bi-file-earmark-pdf"></i> PDF
+                            </button>
+                            <button class="btn btn-sm btn-outline-success btn-report ms-2"
+                                onclick="generateReport('${item.id}', 'excel', this)">
+                                <i class="bi bi-file-earmark-excel"></i> Excel
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (error) {
+                console.error('Ошибка загрузки истории:', error);
+                historyTable.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-danger">
+                            <i class="bi bi-exclamation-triangle me-2"></i>${error.message}
+                        </td>
+                    </tr>
+                `;
+            } finally {
+                refreshHistoryBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+            }
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('ru-RU');
+        }
+
+        // Функция для показа уведомлений
+        function showAlert(message, type) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show`;
+            alert.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="bi ${type === 'success' ? 'bi-check-circle' : type === 'warning' ? 'bi-exclamation-triangle' : 'bi-x-circle'} me-2"></i>
+                    <div>${message}</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+
+            alertContainer.appendChild(alert);
+
+            // Автоматическое скрытие через 5 секунд
+            setTimeout(() => {
+                alert.classList.remove('show');
+                setTimeout(() => alert.remove(), 150);
+            }, 5000);
+        }
+
+        // Глобальная функция для генерации отчетов
+        window.generateReport = async function(id, type, button) {
+            const originalHtml = button.innerHTML;
+
+            // Показываем индикатор загрузки
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+            button.disabled = true;
+
+            try {
+                const response = await fetch(`http://localhost:5000/api/report/${type}/${id}`);
+
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `report_${id}.${type}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                showAlert(`Отчет успешно сгенерирован (${type.toUpperCase()})`, 'success');
+
+            } catch (error) {
+                console.error('Ошибка генерации отчета:', error);
+                showAlert(`Ошибка при генерации отчета: ${error.message}`, 'danger');
+            } finally {
+                button.innerHTML = originalHtml;
+                button.disabled = false;
+            }
+        };
+
+        // Отслеживание прогресса обработки
+        setInterval(async () => {
+            try {
+                const response = await fetch('http://localhost:5000/api/progress');
+                const data = await response.json();
+
+                if (data.total > 0) {
+                    const percent = Math.round((data.current / data.total) * 100);
+                    progressBar.style.width = `${percent}%`;
+                    progressText.textContent = data.message;
+
+                    // Обновляем счетчик объектов
+                    const matches = data.message.match(/Бутылок: (\d+)/);
+                    if (matches && matches[1]) {
+                        objectsCount.textContent = matches[1];
+                        objectCounter.style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка получения прогресса:', error);
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
